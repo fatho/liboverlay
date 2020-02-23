@@ -36,7 +36,7 @@ pub fn redirect_path(path: &Path, write: bool) -> Option<PathBuf> {
                 .ok()?;
 
             // Copy source file if it exists
-            if path.exists() {
+            if path.is_file() {
                 eprintln!("liboverlay: making writable copy");
                 // HACK: This relies crucially on the fact that fs::copy first opens the source path,
                 //  otherwise, our own redirection logic would apply and send the read request to the

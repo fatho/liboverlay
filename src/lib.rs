@@ -175,14 +175,19 @@ pub unsafe extern "C" fn fopen(path: *const c_char, mode: *const c_char) -> *mut
 
 /////////////////////////////////////// Redirection logic ///////////////////////////////////////
 
-fn redirect_open(raw_path: *const c_char, flags: c_int) -> Option<CString> {
+fn c_char_ptr_to_path(raw_path: *const c_char) -> &'static Path {
     use std::os::unix::ffi::OsStrExt;
 
     let cpath = unsafe { CStr::from_ptr(raw_path) };
     let ospath: &std::ffi::OsStr = {
         std::ffi::OsStr::from_bytes(cpath.to_bytes())
     };
-    let path = Path::new(ospath);
+    Path::new(ospath)
+}
+
+fn redirect_open(raw_path: *const c_char, flags: c_int) -> Option<CString> {
+    use std::os::unix::ffi::OsStrExt;
+    let path = c_char_ptr_to_path(raw_path);
     let redirected = redir::redirect_path(path, (flags & (O_WRONLY | O_RDWR | O_CREAT)) != 0)?;
 
     let credir = CString::new(redirected.as_os_str().as_bytes()).ok()?;
@@ -201,6 +206,40 @@ fn redirect_fopen(raw_path: *const c_char, raw_mode: *const c_char) -> Option<CS
     let cmode = unsafe { CStr::from_ptr(raw_mode) };
 
     let redirected = redir::redirect_path(path, cmode.to_bytes() != b"r")?;
+
+    let credir = CString::new(redirected.as_os_str().as_bytes()).ok()?;
+    Some(credir)
+}
+
+
+////////////////////////////////////////////////////////////////////////////
+
+
+import_real!(C_MKDIR, b"mkdir\0", (path: *const c_char, mode: mode_t) -> c_int);
+
+#[no_mangle]
+pub unsafe extern "C" fn mkdir(path: *const c_char, mode: mode_t) -> c_int {
+    eprint!(
+        "mkdir({}, {:o}) = ",
+        CStr::from_ptr(path).to_string_lossy(),
+        mode,
+    );
+    let redir_path = with_reentrancy_guard(None, || redirect_mkdir(path));
+    let ret = match redir_path {
+        Some(redir) => C_MKDIR.call(
+            redir.to_bytes_with_nul().as_ptr() as *const c_char,
+            mode,
+        ),
+        None => C_MKDIR.call(path, mode),
+    };
+    eprintln!("{}", ret);
+    ret
+}
+
+fn redirect_mkdir(raw_path: *const c_char) -> Option<CString> {
+    use std::os::unix::ffi::OsStrExt;
+    let path = c_char_ptr_to_path(raw_path);
+    let redirected = redir::redirect_path(path, true)?;
 
     let credir = CString::new(redirected.as_os_str().as_bytes()).ok()?;
     Some(credir)

@@ -87,7 +87,44 @@ def redirect_lower_writes_new(env: TestEnv) -> None:
     assert ret.returncode == 0
 
     ret = subprocess.run(
+        ["tee", env.lower / 'new_dir' / "new_file.txt"],
+        input=b"It is new",
+        env=env.env,
+        stdout=subprocess.PIPE,
+        stderr=None,
+    )
+    assert ret.returncode != 0
+
+    ret = subprocess.run(
         ["cat", env.lower / "new_file.txt"],
+        env=env.env,
+        stdout=subprocess.PIPE,
+        stderr=None,
+    )
+    assert ret.returncode == 0
+    assert ret.stdout == b"It is new"
+
+
+def redirect_mkdir(env: TestEnv) -> None:
+    ret = subprocess.run(
+        ["mkdir", env.lower / "new_dir"],
+        env=env.env,
+        stdout=subprocess.PIPE,
+        stderr=None,
+    )
+    assert ret.returncode == 0
+
+    ret = subprocess.run(
+        ["tee", env.lower / 'new_dir' / "new_file.txt"],
+        input=b"It is new",
+        env=env.env,
+        stdout=subprocess.PIPE,
+        stderr=None,
+    )
+    assert ret.returncode == 0
+
+    ret = subprocess.run(
+        ["cat", env.lower / "new_dir" / "new_file.txt"],
         env=env.env,
         stdout=subprocess.PIPE,
         stderr=None,
@@ -117,7 +154,7 @@ def run_test(test: Callable[[TestEnv], None]) -> None:
 
 
 def run():
-    tests = [can_read_lower, redirect_lower_writes_existing, redirect_lower_writes_new]
+    tests = [can_read_lower, redirect_lower_writes_existing, redirect_lower_writes_new, redirect_mkdir]
 
     tap.plan(len(tests))
     for test in tests:
