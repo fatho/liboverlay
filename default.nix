@@ -11,14 +11,22 @@ let
   rustChannel = nixpkgs.rustChannelOf {
     rustToolchain = ./rust-toolchain;
   };
+
+  rust = rustChannel.rust.override {
+    extensions = ["rust-src"];
+  };
+
+  python = nixpkgs.python37.withPackages (ps: [
+    ps.mypy
+    ps.black
+  ]);
 in
   nixpkgs.buildEnv {
     name = "liboverlay-dev";
 
     paths = [
       nixpkgs.gcc
-      (rustChannel.rust.override {
-        extensions = ["rust-src"];
-      })
+      rust
+      python
     ];
   }
