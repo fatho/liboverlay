@@ -222,30 +222,31 @@ pub unsafe extern "C" fn __lxstat(version: c_int, path: *const c_char, statbuf: 
 }
 
 
-// import_real!(C_FSTATAT, b"__fxstatat\0", (dirfd: c_int, path: *const c_char, statbuf: *mut c_void, flags: c_int) -> c_int);
+import_real!(C_FSTATAT, b"__fxstatat\0", (version: c_int, dirfd: c_int, path: *const c_char, statbuf: *mut c_void, flags: c_int) -> c_int);
 
-// #[no_mangle]
-// pub unsafe extern "C" fn __fxstatat(dirfd: c_int, path: *const c_char, statbuf: *mut c_void, flags: c_int) -> c_int {
-//     eprint!(
-//         "__fxstatat({}, {}, {:x}, {}) = ",
-//         dirfd,
-//         CStr::from_ptr(path).to_string_lossy(),
-//         statbuf as usize,
-//         flags,
-//     );
-//     let redir_path = with_reentrancy_guard(None, || redirect_path_raw(path, false));
-//     let ret = match redir_path {
-//         Some(redir) => C_FSTATAT.call(
-//             dirfd,
-//             redir.to_bytes_with_nul().as_ptr() as *const c_char,
-//             statbuf,
-//             flags,
-//         ),
-//         None => C_FSTATAT.call(dirfd, path, statbuf, flags),
-//     };
-//     eprintln!("{}", ret);
-//     ret
-// }
+#[no_mangle]
+pub unsafe extern "C" fn __fxstatat(version: c_int, dirfd: c_int, path: *const c_char, statbuf: *mut c_void, flags: c_int) -> c_int {
+    eprint!(
+        "__fxstatat({}, {}, {:x}, {}) = ",
+        dirfd,
+        CStr::from_ptr(path).to_string_lossy(),
+        statbuf as usize,
+        flags,
+    );
+    let redir_path = with_reentrancy_guard(None, || redirect_path_raw(path, false));
+    let ret = match redir_path {
+        Some(redir) => C_FSTATAT.call(
+            version,
+            dirfd,
+            redir.to_bytes_with_nul().as_ptr() as *const c_char,
+            statbuf,
+            flags,
+        ),
+        None => C_FSTATAT.call(version, dirfd, path, statbuf, flags),
+    };
+    eprintln!("{}", ret);
+    ret
+}
 
 
 /////////////////////////////////////// Redirection logic ///////////////////////////////////////
@@ -340,7 +341,9 @@ pub unsafe extern "C" fn opendir(path: *const c_char, mode: mode_t) -> *mut c_vo
     ret
 }
 
+#[allow(non_camel_case_types)]
 pub type ino_t = u64;
+#[allow(non_camel_case_types)]
 pub type off_t = i64;
 #[repr(C)]
 pub struct dirent {
