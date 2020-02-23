@@ -86,12 +86,12 @@ import_real!(C_OPEN, b"open\0", (path: *const c_char, flags: c_int, mode: mode_t
 
 #[no_mangle]
 pub unsafe extern "C" fn open(path: *const c_char, flags: c_int, mode: mode_t) -> c_int {
-    eprint!(
+    config::if_debug(|| eprint!(
         "open({}, {:b}, {:b}) = ",
         CStr::from_ptr(path).to_string_lossy(),
         flags,
         mode
-    );
+    ));
     let redir_path = with_reentrancy_guard(None, || redirect_path_raw(path, (flags & (O_RDWR | O_WRONLY | O_CREAT)) != 0));
     let ret = match redir_path {
         Some(redir) => C_OPEN.call(
@@ -101,7 +101,7 @@ pub unsafe extern "C" fn open(path: *const c_char, flags: c_int, mode: mode_t) -
         ),
         None => C_OPEN.call(path, flags, mode),
     };
-    eprintln!("{}", ret);
+    config::if_debug(|| eprintln!("{}", ret));
     ret
 }
 
@@ -109,12 +109,12 @@ import_real!(C_OPEN64, b"open64\0", (path: *const c_char, flags: c_int, mode: mo
 
 #[no_mangle]
 pub unsafe extern "C" fn open64(path: *const c_char, flags: c_int, mode: mode_t) -> c_int {
-    eprint!(
+    config::if_debug(|| eprint!(
         "open64({}, {:b}, {:b}) = ",
         CStr::from_ptr(path).to_string_lossy(),
         flags,
         mode
-    );
+    ));
     let redir_path = with_reentrancy_guard(None, || redirect_path_raw(path, (flags & (O_RDWR | O_WRONLY | O_CREAT)) != 0));
     let ret = match redir_path {
         Some(redir) => C_OPEN64.call(
@@ -124,7 +124,7 @@ pub unsafe extern "C" fn open64(path: *const c_char, flags: c_int, mode: mode_t)
         ),
         None => C_OPEN64.call(path, flags, mode),
     };
-    eprintln!("{}", ret);
+    config::if_debug(|| eprintln!("{}", ret));
     ret
 }
 
@@ -132,13 +132,13 @@ import_real!(C_OPENAT, b"openat\0", (dirfd: c_int, path: *const c_char, flags: c
 
 #[no_mangle]
 pub unsafe extern "C" fn openat(dirfd: c_int, path: *const c_char, flags: c_int, mode: mode_t) -> c_int {
-    eprint!(
+    config::if_debug(|| eprint!(
         "openat({}, {}, {:b}, {:b}) = ",
         dirfd,
         CStr::from_ptr(path).to_string_lossy(),
         flags,
         mode
-    );
+    ));
     // When path is absolute, dirfd will be ignored.
     let redir_path = with_reentrancy_guard(None, || redirect_path_raw(path, (flags & (O_RDWR | O_WRONLY | O_CREAT)) != 0));
     let ret = match redir_path {
@@ -150,7 +150,7 @@ pub unsafe extern "C" fn openat(dirfd: c_int, path: *const c_char, flags: c_int,
         ),
         None => C_OPENAT.call(dirfd, path, flags, mode),
     };
-    eprintln!("{}", ret);
+    config::if_debug(|| eprintln!("{}", ret));
     ret
 }
 
@@ -158,11 +158,11 @@ import_real!(C_FOPEN, b"fopen\0", (path: *const c_char, mode: *const c_char) -> 
 
 #[no_mangle]
 pub unsafe extern "C" fn fopen(path: *const c_char, mode: *const c_char) -> *mut c_void {
-    eprint!(
+    config::if_debug(|| eprint!(
         "fopen({}, {}) = ",
         CStr::from_ptr(path).to_string_lossy(),
         CStr::from_ptr(mode).to_string_lossy(),
-    );
+    ));
     let redir_path = with_reentrancy_guard(None, || redirect_fopen(path, mode));
     let ret = match redir_path {
         Some(redir) => C_FOPEN.call(
@@ -171,7 +171,7 @@ pub unsafe extern "C" fn fopen(path: *const c_char, mode: *const c_char) -> *mut
         ),
         None => C_FOPEN.call(path, mode),
     };
-    eprintln!("{:x}", ret as usize);
+    config::if_debug(|| eprintln!("{:x}", ret as usize));
     ret
 }
 
@@ -179,12 +179,12 @@ import_real!(C_STAT, b"__xstat\0", (version: c_int, path: *const c_char, statbuf
 
 #[no_mangle]
 pub unsafe extern "C" fn __xstat(version: c_int, path: *const c_char, statbuf: *mut c_void) -> c_int {
-    eprint!(
+    config::if_debug(|| eprint!(
         "__xstat({}, {}, {:x}) = ",
         version,
         CStr::from_ptr(path).to_string_lossy(),
         statbuf as usize,
-    );
+    ));
     let redir_path = with_reentrancy_guard(None, || redirect_path_raw(path, false));
     let ret = match redir_path {
         Some(redir) => C_STAT.call(
@@ -194,7 +194,7 @@ pub unsafe extern "C" fn __xstat(version: c_int, path: *const c_char, statbuf: *
         ),
         None => C_STAT.call(version, path, statbuf),
     };
-    eprintln!("{}", ret);
+    config::if_debug(|| eprintln!("{}", ret));
     ret
 }
 
@@ -202,12 +202,12 @@ import_real!(C_LSTAT, b"__lxstat\0", (version: c_int, path: *const c_char, statb
 
 #[no_mangle]
 pub unsafe extern "C" fn __lxstat(version: c_int, path: *const c_char, statbuf: *mut c_void) -> c_int {
-    eprint!(
+    config::if_debug(|| eprint!(
         "__lxstat({}, {}, {:x}) = ",
         version,
         CStr::from_ptr(path).to_string_lossy(),
         statbuf as usize,
-    );
+    ));
     let redir_path = with_reentrancy_guard(None, || redirect_path_raw(path, false));
     let ret = match redir_path {
         Some(redir) => C_LSTAT.call(
@@ -217,7 +217,7 @@ pub unsafe extern "C" fn __lxstat(version: c_int, path: *const c_char, statbuf: 
         ),
         None => C_LSTAT.call(version, path, statbuf),
     };
-    eprintln!("{}", ret);
+    config::if_debug(|| eprintln!("{}", ret));
     ret
 }
 
@@ -226,13 +226,13 @@ import_real!(C_FSTATAT, b"__fxstatat\0", (version: c_int, dirfd: c_int, path: *c
 
 #[no_mangle]
 pub unsafe extern "C" fn __fxstatat(version: c_int, dirfd: c_int, path: *const c_char, statbuf: *mut c_void, flags: c_int) -> c_int {
-    eprint!(
+    config::if_debug(|| eprint!(
         "__fxstatat({}, {}, {:x}, {}) = ",
         dirfd,
         CStr::from_ptr(path).to_string_lossy(),
         statbuf as usize,
         flags,
-    );
+    ));
     let redir_path = with_reentrancy_guard(None, || redirect_path_raw(path, false));
     let ret = match redir_path {
         Some(redir) => C_FSTATAT.call(
@@ -244,7 +244,7 @@ pub unsafe extern "C" fn __fxstatat(version: c_int, dirfd: c_int, path: *const c
         ),
         None => C_FSTATAT.call(version, dirfd, path, statbuf, flags),
     };
-    eprintln!("{}", ret);
+    config::if_debug(|| eprintln!("{}", ret));
     ret
 }
 
@@ -283,11 +283,11 @@ import_real!(C_MKDIR, b"mkdir\0", (path: *const c_char, mode: mode_t) -> c_int);
 
 #[no_mangle]
 pub unsafe extern "C" fn mkdir(path: *const c_char, mode: mode_t) -> c_int {
-    eprint!(
+    config::if_debug(|| eprint!(
         "mkdir({}, {:o}) = ",
         CStr::from_ptr(path).to_string_lossy(),
         mode,
-    );
+    ));
     let redir_path = with_reentrancy_guard(None, || redirect_path_raw(path, true));
     let ret = match redir_path {
         Some(redir) => C_MKDIR.call(
@@ -296,7 +296,7 @@ pub unsafe extern "C" fn mkdir(path: *const c_char, mode: mode_t) -> c_int {
         ),
         None => C_MKDIR.call(path, mode),
     };
-    eprintln!("{}", ret);
+    config::if_debug(|| eprintln!("{}", ret));
     ret
 }
 
@@ -306,11 +306,11 @@ import_real!(C_OPENDIR, b"opendir\0", (path: *const c_char, mode: mode_t) -> *mu
 
 #[no_mangle]
 pub unsafe extern "C" fn opendir(path: *const c_char, mode: mode_t) -> *mut c_void {
-    eprint!(
+    config::if_debug(|| eprint!(
         "opendir({}, {:o}) = ",
         CStr::from_ptr(path).to_string_lossy(),
         mode,
-    );
+    ));
     let redir_path = with_reentrancy_guard(None, || redirect_path_raw(path, false));
     let ret = match redir_path {
         Some(redir) => {
@@ -322,7 +322,7 @@ pub unsafe extern "C" fn opendir(path: *const c_char, mode: mode_t) -> *mut c_vo
             );
 
             if ! lower_dir.is_null() {
-                eprintln!("liboverlayf: merging opendir");
+                config::if_debug(|| eprintln!("liboverlayf: merging opendir"));
                 // If the lower dir exists, we need to merge the contents of the two dirs
                 let mut opendirs = opendirs().lock().unwrap();
                 
@@ -337,7 +337,7 @@ pub unsafe extern "C" fn opendir(path: *const c_char, mode: mode_t) -> *mut c_vo
         }
         None => C_OPENDIR.call(path, mode),
     };
-    eprintln!("{:x}", ret as usize);
+    config::if_debug(|| eprintln!("{:x}", ret as usize));
     ret
 }
 
@@ -358,10 +358,10 @@ import_real!(C_READDIR, b"readdir\0", (dir: *mut c_void) -> *mut dirent);
 
 #[no_mangle]
 pub unsafe extern "C" fn readdir(dir: *mut c_void) -> *mut dirent {
-    eprint!(
+    config::if_debug(|| eprint!(
         "readdir({:x}) = ",
         dir as usize,
-    );
+    ));
     let ret = IS_HOOKED.with(|is_hooked: &Cell<bool>| {
         if is_hooked.get() {
             C_READDIR.call(dir)
@@ -395,7 +395,7 @@ pub unsafe extern "C" fn readdir(dir: *mut c_void) -> *mut dirent {
             }            
         }
     });
-    eprintln!("{:x}", ret as usize);
+    config::if_debug(|| eprintln!("{:x}", ret as usize));
     ret
 }
 
@@ -404,20 +404,20 @@ import_real!(C_CLOSEDIR, b"closedir\0", (dir: *mut c_void) -> c_int);
 
 #[no_mangle]
 pub unsafe extern "C" fn closedir(dir: *mut c_void) -> c_int {
-    eprint!(
+    config::if_debug(|| eprint!(
         "closedir({:x}) = ",
         dir as usize,
-    );
+    ));
     with_reentrancy_guard((), || {
         let removed = opendirs().lock().unwrap().remove(&(dir as usize));
         if let Some(od) = removed {
             // Only close lower dir as the upper dir is used as key and will be closed down below
-            eprintln!("liboverlay: closing merged opendir");
+            config::if_debug(|| eprintln!("liboverlay: closing merged opendir"));
             C_CLOSEDIR.call(od.lower);
         }
     });
     let ret = C_CLOSEDIR.call(dir);
-    eprintln!("{}", ret);
+    config::if_debug(|| eprintln!("{}", ret));
     ret
 }
 
@@ -456,10 +456,10 @@ import_real!(C_UNLINK, b"unlink\0", (path: *const c_char) -> c_int);
 
 #[no_mangle]
 pub unsafe extern "C" fn unlink(path: *const c_char) -> c_int {
-    eprint!(
+    config::if_debug(|| eprint!(
         "unlink({}) = ",
         CStr::from_ptr(path).to_string_lossy(),
-    );
+    ));
     let redir_path = with_reentrancy_guard(None, || redirect_path_raw(path, false));
     let ret = match redir_path {
         Some(redir) => C_UNLINK.call(
@@ -467,7 +467,7 @@ pub unsafe extern "C" fn unlink(path: *const c_char) -> c_int {
         ),
         None => C_UNLINK.call(path),
     };
-    eprintln!("{}", ret);
+    config::if_debug(|| eprintln!("{}", ret));
     ret
 }
 
@@ -476,12 +476,12 @@ import_real!(C_UNLINKAT, b"unlinkat\0", (dirfd: c_int, path: *const c_char, flag
 
 #[no_mangle]
 pub unsafe extern "C" fn unlinkat(dirfd: c_int, path: *const c_char, flags: c_int) -> c_int {
-    eprint!(
+    config::if_debug(|| eprint!(
         "unlinkat({}, {}, {}) = ",
         dirfd,
         CStr::from_ptr(path).to_string_lossy(),
         flags,
-    );
+    ));
     let redir_path = with_reentrancy_guard(None, || redirect_path_raw(path, false));
     let ret = match redir_path {
         Some(redir) => C_UNLINKAT.call(
@@ -491,7 +491,7 @@ pub unsafe extern "C" fn unlinkat(dirfd: c_int, path: *const c_char, flags: c_in
         ),
         None => C_UNLINKAT.call(dirfd, path, flags),
     };
-    eprintln!("{}", ret);
+    config::if_debug(|| eprintln!("{}", ret));
     ret
 }
 
@@ -499,10 +499,10 @@ import_real!(C_RMDIR, b"rmdir\0", (path: *const c_char) -> c_int);
 
 #[no_mangle]
 pub unsafe extern "C" fn rmdir(path: *const c_char) -> c_int {
-    eprint!(
+    config::if_debug(|| eprint!(
         "rmdir({}) = ",
         CStr::from_ptr(path).to_string_lossy(),
-    );
+    ));
     let redir_path = with_reentrancy_guard(None, || redirect_path_raw(path, false));
     let ret = match redir_path {
         Some(redir) => C_RMDIR.call(
@@ -510,6 +510,6 @@ pub unsafe extern "C" fn rmdir(path: *const c_char) -> c_int {
         ),
         None => C_RMDIR.call(path),
     };
-    eprintln!("{}", ret);
+    config::if_debug(|| eprintln!("{}", ret));
     ret
 }

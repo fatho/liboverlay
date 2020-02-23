@@ -4,6 +4,7 @@ use std::path::PathBuf;
 pub struct Config {
     pub lower_dir: PathBuf,
     pub upper_dir: PathBuf,
+    pub debug: bool,
 }
 
 impl Config {
@@ -24,9 +25,12 @@ impl Config {
             }
         };
 
+        let debug = std::env::var("LIBOVERLAY_DEBUG").map_or(false, |val| &val == "1");
+
         Some(Config {
             lower_dir,
             upper_dir,
+            debug,
         })
     }
 }
@@ -39,12 +43,25 @@ pub static INIT_CONFIG: extern "C" fn() = {
     extern "C" fn init_config_impl() {
         unsafe {
             CONFIG = Config::from_env();
-            eprintln!("liboverlay: initialized: {:?}", CONFIG);
+            if let Some(cfg) = CONFIG.as_ref() {
+                if cfg.debug {
+                    eprintln!("liboverlay: initialized: {:?}", CONFIG);
+                }
+            }
         }
     }
     init_config_impl
 };
 
+#[inline(always)]
 pub fn get_config() -> Option<&'static Config> {
     unsafe { CONFIG.as_ref() }
+}
+
+
+#[inline(always)]
+pub fn if_debug<F: FnOnce()>(callback: F) {
+    if get_config().map_or(false, |cfg| cfg.debug) {
+        callback()
+    }
 }
