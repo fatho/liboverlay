@@ -445,3 +445,68 @@ struct OpenDir {
 
 unsafe impl Send for OpenDir {}
 unsafe impl Sync for OpenDir {}
+
+////////////////////////////////////////////////////////////////////////////
+
+
+import_real!(C_UNLINK, b"unlink\0", (path: *const c_char) -> c_int);
+
+#[no_mangle]
+pub unsafe extern "C" fn unlink(path: *const c_char) -> c_int {
+    eprint!(
+        "unlink({}) = ",
+        CStr::from_ptr(path).to_string_lossy(),
+    );
+    let redir_path = with_reentrancy_guard(None, || redirect_path_raw(path, false));
+    let ret = match redir_path {
+        Some(redir) => C_UNLINK.call(
+            redir.to_bytes_with_nul().as_ptr() as *const c_char,
+        ),
+        None => C_UNLINK.call(path),
+    };
+    eprintln!("{}", ret);
+    ret
+}
+
+
+import_real!(C_UNLINKAT, b"unlinkat\0", (dirfd: c_int, path: *const c_char, flags: c_int) -> c_int);
+
+#[no_mangle]
+pub unsafe extern "C" fn unlinkat(dirfd: c_int, path: *const c_char, flags: c_int) -> c_int {
+    eprint!(
+        "unlinkat({}, {}, {}) = ",
+        dirfd,
+        CStr::from_ptr(path).to_string_lossy(),
+        flags,
+    );
+    let redir_path = with_reentrancy_guard(None, || redirect_path_raw(path, false));
+    let ret = match redir_path {
+        Some(redir) => C_UNLINKAT.call(
+            dirfd,
+            redir.to_bytes_with_nul().as_ptr() as *const c_char,
+            flags,
+        ),
+        None => C_UNLINKAT.call(dirfd, path, flags),
+    };
+    eprintln!("{}", ret);
+    ret
+}
+
+import_real!(C_RMDIR, b"rmdir\0", (path: *const c_char) -> c_int);
+
+#[no_mangle]
+pub unsafe extern "C" fn rmdir(path: *const c_char) -> c_int {
+    eprint!(
+        "rmdir({}) = ",
+        CStr::from_ptr(path).to_string_lossy(),
+    );
+    let redir_path = with_reentrancy_guard(None, || redirect_path_raw(path, false));
+    let ret = match redir_path {
+        Some(redir) => C_RMDIR.call(
+            redir.to_bytes_with_nul().as_ptr() as *const c_char,
+        ),
+        None => C_RMDIR.call(path),
+    };
+    eprintln!("{}", ret);
+    ret
+}

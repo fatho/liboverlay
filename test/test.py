@@ -18,89 +18,57 @@ class TestEnv(NamedTuple):
     upper: Path
     env: Mapping[str, str]
 
+    def overlay_read(self, relative: str) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            ["cat", self.lower / relative], env=self.env, stdout=subprocess.PIPE, stderr=None
+        )
+
+    def overlay_write(self, relative: str, contents: bytes) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            ["tee", self.lower / relative], input=contents, env=self.env, stdout=subprocess.PIPE, stderr=None
+        )
+
+
 
 def read_all(path: Union[str, Path]) -> bytes:
     with open(path, mode="rb") as file:
         return file.read()
 
 
-def exec_bash(script: str) -> bytes:
-    return subprocess.check_output(["bash", "-c", script])
-
-
 def can_read_lower(env: TestEnv) -> None:
-    ret = subprocess.run(
-        ["cat", env.lower / "foo.txt"], env=env.env, stdout=subprocess.PIPE, stderr=None
-    )
+    ret = env.overlay_read("foo.txt")
     assert ret.returncode == 0
     assert ret.stdout == read_all(env.lower / "foo.txt")
 
-    ret = subprocess.run(
-        ["cat", env.lower / "bar" / "bar.txt"],
-        env=env.env,
-        stdout=subprocess.PIPE,
-        stderr=None,
-    )
+    ret = env.overlay_read("bar/bar.txt")
     assert ret.returncode == 0
     assert ret.stdout == read_all(env.lower / "bar" / "bar.txt")
 
-    ret = subprocess.run(
-        ["cat", env.lower / "bar" / "baz.txt"],
-        env=env.env,
-        stdout=subprocess.PIPE,
-        stderr=None,
-    )
+    ret = env.overlay_read("bar/baz.txt")
     assert ret.returncode != 0
 
 
 def redirect_lower_writes_existing(env: TestEnv) -> None:
-    ret = subprocess.run(
-        ["cat", env.lower / "foo.txt"], env=env.env, stdout=subprocess.PIPE, stderr=None
-    )
+    ret = env.overlay_read("foo.txt")
     assert ret.returncode == 0
     assert ret.stdout == read_all(env.lower / "foo.txt")
 
-    ret = subprocess.run(
-        ["tee", env.lower / "foo.txt"],
-        input=b"Overwrite",
-        env=env.env,
-        stdout=subprocess.PIPE,
-        stderr=None,
-    )
+    ret = env.overlay_write("foo.txt", b"Overwrite")
     assert ret.returncode == 0
 
-    ret = subprocess.run(
-        ["cat", env.lower / "foo.txt"], env=env.env, stdout=subprocess.PIPE, stderr=None
-    )
+    ret = env.overlay_read("foo.txt")
     assert ret.returncode == 0
     assert ret.stdout == b"Overwrite"
 
 
 def redirect_lower_writes_new(env: TestEnv) -> None:
-    ret = subprocess.run(
-        ["tee", env.lower / "new_file.txt"],
-        input=b"It is new",
-        env=env.env,
-        stdout=subprocess.PIPE,
-        stderr=None,
-    )
+    ret = env.overlay_write("new_file.txt", b"It is new")
     assert ret.returncode == 0
 
-    ret = subprocess.run(
-        ["tee", env.lower / 'new_dir' / "new_file.txt"],
-        input=b"It is new",
-        env=env.env,
-        stdout=subprocess.PIPE,
-        stderr=None,
-    )
+    ret = env.overlay_write("new_dir/new_file.txt", b"It is new")
     assert ret.returncode != 0
 
-    ret = subprocess.run(
-        ["cat", env.lower / "new_file.txt"],
-        env=env.env,
-        stdout=subprocess.PIPE,
-        stderr=None,
-    )
+    ret = env.overlay_read("new_file.txt")
     assert ret.returncode == 0
     assert ret.stdout == b"It is new"
 
@@ -114,77 +82,47 @@ def redirect_mkdir(env: TestEnv) -> None:
     )
     assert ret.returncode == 0
 
-    ret = subprocess.run(
-        ["tee", env.lower / 'new_dir' / "new_file.txt"],
-        input=b"It is new",
-        env=env.env,
-        stdout=subprocess.PIPE,
-        stderr=None,
-    )
+    ret = env.overlay_write("new_dir/new_file.txt", b"It is new")
     assert ret.returncode == 0
 
-    ret = subprocess.run(
-        ["cat", env.lower / "new_dir" / "new_file.txt"],
-        env=env.env,
-        stdout=subprocess.PIPE,
-        stderr=None,
-    )
+    ret = env.overlay_read("new_dir/new_file.txt")
     assert ret.returncode == 0
     assert ret.stdout == b"It is new"
 
 
 def redirect_readdir(env: TestEnv) -> None:
     ret = subprocess.run(
-        ["ls", env.lower / "bar"],
-        env=env.env,
-        stdout=subprocess.PIPE,
-        stderr=None,
+        ["ls", env.lower / "bar"], env=env.env, stdout=subprocess.PIPE, stderr=None,
     )
     assert ret.returncode == 0
-    assert ret.stdout.splitlines() == [b'bar.txt']
+    assert ret.stdout.splitlines() == [b"bar.txt"]
 
-    ret = subprocess.run(
-        ["tee", env.lower / 'bar' / "baz.txt"],
-        input=b"It is new",
-        env=env.env,
-        stdout=subprocess.PIPE,
-        stderr=None,
-    )
+    ret = env.overlay_write("bar/baz.txt", b"It is new")
     assert ret.returncode == 0
 
     ret = subprocess.run(
-        ["ls", env.lower / "bar"],
-        env=env.env,
-        stdout=subprocess.PIPE,
-        stderr=None,
+        ["ls", env.lower / "bar"], env=env.env, stdout=subprocess.PIPE, stderr=None,
     )
     assert ret.returncode == 0
-    assert sorted(ret.stdout.splitlines()) == [b'bar.txt', b'baz.txt']
+    assert sorted(ret.stdout.splitlines()) == [b"bar.txt", b"baz.txt"]
 
-    ret = subprocess.run(
-        ["tee", env.lower / 'bar' / "bar.txt"],
-        input=b"It is new",
-        env=env.env,
-        stdout=subprocess.PIPE,
-        stderr=None,
-    )
+    ret = env.overlay_write("bar/bar.txt", b"It is new")
     assert ret.returncode == 0
 
     ret = subprocess.run(
-        ["ls", env.lower / "bar"],
-        env=env.env,
-        stdout=subprocess.PIPE,
-        stderr=None,
+        ["ls", env.lower / "bar"], env=env.env, stdout=subprocess.PIPE, stderr=None,
     )
     assert ret.returncode == 0
     tap.diagnostic(str(ret.stdout.splitlines()))
-    assert sorted(ret.stdout.splitlines()) == [b'bar.txt', b'baz.txt']
+    assert sorted(ret.stdout.splitlines()) == [b"bar.txt", b"baz.txt"]
 
 
 def redirect_stat(env: TestEnv) -> None:
+    ret = env.overlay_write("new_file.txt", b"It is new")
+    assert ret.returncode == 0
+
     ret = subprocess.run(
-        ["tee", env.lower / "new_file.txt"],
-        input=b"It is new",
+        ["stat", env.lower / "foo.txt"],
         env=env.env,
         stdout=subprocess.PIPE,
         stderr=None,
@@ -192,7 +130,24 @@ def redirect_stat(env: TestEnv) -> None:
     assert ret.returncode == 0
 
     ret = subprocess.run(
-        ["stat", env.lower / 'foo.txt'],
+        ["stat", env.lower / "new_file.txt"],
+        env=env.env,
+        stdout=subprocess.PIPE,
+        stderr=None,
+    )
+    assert ret.returncode == 0
+
+
+def redirect_unlink(env: TestEnv) -> None:
+    ret = env.overlay_write("new_file.txt", b"It is new")
+    assert ret.returncode == 0
+
+    ret = env.overlay_write("foo.txt", b"It is new")
+    assert ret.returncode == 0
+
+    ret = subprocess.run(
+        ["unlink", env.lower / "foo.txt"],
+        input=b"n\n",
         env=env.env,
         stdout=subprocess.PIPE,
         stderr=None,
@@ -200,7 +155,47 @@ def redirect_stat(env: TestEnv) -> None:
     assert ret.returncode == 0
 
     ret = subprocess.run(
-        ["stat", env.lower / 'new_file.txt'],
+        ["unlink", env.lower / "new_file.txt"],
+        input=b"n\n",
+        env=env.env,
+        stdout=subprocess.PIPE,
+        stderr=None,
+    )
+    assert ret.returncode == 0
+
+    # Deletion should fail if it hits the underlying directory
+    ret = subprocess.run(
+        ["unlink", env.lower / "foo.txt"],
+        input=b"n\n",
+        env=env.env,
+        stdout=subprocess.PIPE,
+        stderr=None,
+    )
+    assert ret.returncode != 0
+
+
+def redirect_rmdir(env: TestEnv) -> None:
+    ret = subprocess.run(
+        ["rmdir", env.lower / "new_dir"],
+        input=b"n\n",
+        env=env.env,
+        stdout=subprocess.PIPE,
+        stderr=None,
+    )
+    assert ret.returncode != 0
+
+    ret = subprocess.run(
+        ["mkdir", env.lower / "new_dir"],
+        input=b"n\n",
+        env=env.env,
+        stdout=subprocess.PIPE,
+        stderr=None,
+    )
+    assert ret.returncode == 0
+
+    ret = subprocess.run(
+        ["rmdir", env.lower / "new_dir"],
+        input=b"n\n",
         env=env.env,
         stdout=subprocess.PIPE,
         stderr=None,
@@ -229,7 +224,16 @@ def run_test(test: Callable[[TestEnv], None]) -> None:
 
 
 def run():
-    tests = [can_read_lower, redirect_lower_writes_existing, redirect_lower_writes_new, redirect_mkdir, redirect_readdir, redirect_stat]
+    tests = [
+        can_read_lower,
+        redirect_lower_writes_existing,
+        redirect_lower_writes_new,
+        redirect_mkdir,
+        redirect_readdir,
+        redirect_stat,
+        redirect_unlink,
+        redirect_rmdir,
+    ]
 
     tap.plan(len(tests))
     for test in tests:
