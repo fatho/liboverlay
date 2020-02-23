@@ -133,6 +133,54 @@ def redirect_mkdir(env: TestEnv) -> None:
     assert ret.stdout == b"It is new"
 
 
+def redirect_readdir(env: TestEnv) -> None:
+    ret = subprocess.run(
+        ["ls", env.lower / "bar"],
+        env=env.env,
+        stdout=subprocess.PIPE,
+        stderr=None,
+    )
+    assert ret.returncode == 0
+    assert ret.stdout.splitlines() == [b'bar.txt']
+
+    ret = subprocess.run(
+        ["tee", env.lower / 'bar' / "baz.txt"],
+        input=b"It is new",
+        env=env.env,
+        stdout=subprocess.PIPE,
+        stderr=None,
+    )
+    assert ret.returncode == 0
+
+    ret = subprocess.run(
+        ["ls", env.lower / "bar"],
+        env=env.env,
+        stdout=subprocess.PIPE,
+        stderr=None,
+    )
+    assert ret.returncode == 0
+    assert sorted(ret.stdout.splitlines()) == [b'bar.txt', b'baz.txt']
+
+    ret = subprocess.run(
+        ["tee", env.lower / 'bar' / "bar.txt"],
+        input=b"It is new",
+        env=env.env,
+        stdout=subprocess.PIPE,
+        stderr=None,
+    )
+    assert ret.returncode == 0
+
+    ret = subprocess.run(
+        ["ls", env.lower / "bar"],
+        env=env.env,
+        stdout=subprocess.PIPE,
+        stderr=None,
+    )
+    assert ret.returncode == 0
+    tap.diagnostic(str(ret.stdout.splitlines()))
+    assert sorted(ret.stdout.splitlines()) == [b'bar.txt', b'baz.txt']
+
+
 def run_test(test: Callable[[TestEnv], None]) -> None:
     with tempfile.TemporaryDirectory() as upper_dir:
         env = os.environ.copy()
@@ -154,7 +202,7 @@ def run_test(test: Callable[[TestEnv], None]) -> None:
 
 
 def run():
-    tests = [can_read_lower, redirect_lower_writes_existing, redirect_lower_writes_new, redirect_mkdir]
+    tests = [can_read_lower, redirect_lower_writes_existing, redirect_lower_writes_new, redirect_mkdir, redirect_readdir]
 
     tap.plan(len(tests))
     for test in tests:
