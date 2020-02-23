@@ -175,6 +175,79 @@ pub unsafe extern "C" fn fopen(path: *const c_char, mode: *const c_char) -> *mut
     ret
 }
 
+import_real!(C_STAT, b"__xstat\0", (version: c_int, path: *const c_char, statbuf: *mut c_void) -> c_int);
+
+#[no_mangle]
+pub unsafe extern "C" fn __xstat(version: c_int, path: *const c_char, statbuf: *mut c_void) -> c_int {
+    eprint!(
+        "__xstat({}, {}, {:x}) = ",
+        version,
+        CStr::from_ptr(path).to_string_lossy(),
+        statbuf as usize,
+    );
+    let redir_path = with_reentrancy_guard(None, || redirect_path_raw(path, false));
+    let ret = match redir_path {
+        Some(redir) => C_STAT.call(
+            version,
+            redir.to_bytes_with_nul().as_ptr() as *const c_char,
+            statbuf,
+        ),
+        None => C_STAT.call(version, path, statbuf),
+    };
+    eprintln!("{}", ret);
+    ret
+}
+
+import_real!(C_LSTAT, b"__lxstat\0", (version: c_int, path: *const c_char, statbuf: *mut c_void) -> c_int);
+
+#[no_mangle]
+pub unsafe extern "C" fn __lxstat(version: c_int, path: *const c_char, statbuf: *mut c_void) -> c_int {
+    eprint!(
+        "__lxstat({}, {}, {:x}) = ",
+        version,
+        CStr::from_ptr(path).to_string_lossy(),
+        statbuf as usize,
+    );
+    let redir_path = with_reentrancy_guard(None, || redirect_path_raw(path, false));
+    let ret = match redir_path {
+        Some(redir) => C_LSTAT.call(
+            version,
+            redir.to_bytes_with_nul().as_ptr() as *const c_char,
+            statbuf,
+        ),
+        None => C_LSTAT.call(version, path, statbuf),
+    };
+    eprintln!("{}", ret);
+    ret
+}
+
+
+// import_real!(C_FSTATAT, b"__fxstatat\0", (dirfd: c_int, path: *const c_char, statbuf: *mut c_void, flags: c_int) -> c_int);
+
+// #[no_mangle]
+// pub unsafe extern "C" fn __fxstatat(dirfd: c_int, path: *const c_char, statbuf: *mut c_void, flags: c_int) -> c_int {
+//     eprint!(
+//         "__fxstatat({}, {}, {:x}, {}) = ",
+//         dirfd,
+//         CStr::from_ptr(path).to_string_lossy(),
+//         statbuf as usize,
+//         flags,
+//     );
+//     let redir_path = with_reentrancy_guard(None, || redirect_path_raw(path, false));
+//     let ret = match redir_path {
+//         Some(redir) => C_FSTATAT.call(
+//             dirfd,
+//             redir.to_bytes_with_nul().as_ptr() as *const c_char,
+//             statbuf,
+//             flags,
+//         ),
+//         None => C_FSTATAT.call(dirfd, path, statbuf, flags),
+//     };
+//     eprintln!("{}", ret);
+//     ret
+// }
+
+
 /////////////////////////////////////// Redirection logic ///////////////////////////////////////
 
 fn c_char_ptr_to_path(raw_path: *const c_char) -> &'static Path {

@@ -181,6 +181,33 @@ def redirect_readdir(env: TestEnv) -> None:
     assert sorted(ret.stdout.splitlines()) == [b'bar.txt', b'baz.txt']
 
 
+def redirect_stat(env: TestEnv) -> None:
+    ret = subprocess.run(
+        ["tee", env.lower / "new_file.txt"],
+        input=b"It is new",
+        env=env.env,
+        stdout=subprocess.PIPE,
+        stderr=None,
+    )
+    assert ret.returncode == 0
+
+    ret = subprocess.run(
+        ["stat", env.lower / 'foo.txt'],
+        env=env.env,
+        stdout=subprocess.PIPE,
+        stderr=None,
+    )
+    assert ret.returncode == 0
+
+    ret = subprocess.run(
+        ["stat", env.lower / 'new_file.txt'],
+        env=env.env,
+        stdout=subprocess.PIPE,
+        stderr=None,
+    )
+    assert ret.returncode == 0
+
+
 def run_test(test: Callable[[TestEnv], None]) -> None:
     with tempfile.TemporaryDirectory() as upper_dir:
         env = os.environ.copy()
@@ -202,7 +229,7 @@ def run_test(test: Callable[[TestEnv], None]) -> None:
 
 
 def run():
-    tests = [can_read_lower, redirect_lower_writes_existing, redirect_lower_writes_new, redirect_mkdir, redirect_readdir]
+    tests = [can_read_lower, redirect_lower_writes_existing, redirect_lower_writes_new, redirect_mkdir, redirect_readdir, redirect_stat]
 
     tap.plan(len(tests))
     for test in tests:
