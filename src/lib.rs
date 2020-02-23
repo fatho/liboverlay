@@ -2,59 +2,11 @@ use std::thread_local;
 use std::cell::Cell;
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_void};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::atomic::{AtomicPtr, Ordering};
 
-/////////////////////////////////////// Configuration ///////////////////////////////////////
-
-#[derive(Debug)]
-pub struct Config {
-    pub lower_dir: PathBuf,
-    pub upper_dir: PathBuf,
-}
-
-impl Config {
-    pub fn from_env() -> Option<Config> {
-        let lower_dir = match std::env::var("LIBOVERLAY_LOWER_DIR") {
-            Ok(path) => PathBuf::from(path),
-            Err(_) => {
-                eprintln!("liboverlay:  LIBOVERLAY_LOWER_DIR not specified");
-                return None;
-            }
-        };
-
-        let upper_dir = match std::env::var("LIBOVERLAY_UPPER_DIR") {
-            Ok(path) => PathBuf::from(path),
-            Err(_) => {
-                eprintln!("liboverlay:  LIBOVERLAY_UPPER_DIR not specified");
-                return None;
-            }
-        };
-
-        Some(Config {
-            lower_dir,
-            upper_dir,
-        })
-    }
-}
-
-static mut CONFIG: Option<Config> = None;
-
-#[used]
-#[cfg_attr(target_os = "linux", link_section = ".ctors")]
-pub static INIT_CONFIG: extern "C" fn() = {
-    extern "C" fn init_config_impl() {
-        unsafe {
-            CONFIG = Config::from_env();
-            eprintln!("liboverlay: initialized: {:?}", CONFIG);
-        }
-    }
-    init_config_impl
-};
-
-pub fn get_config() -> Option<&'static Config> {
-    unsafe { CONFIG.as_ref() }
-}
+mod redir;
+mod config;
 
 /////////////////////////////////////// Symbol lookup/redirection ///////////////////////////////////////
 
@@ -104,7 +56,6 @@ macro_rules! import_real {
 
 /////////////////////////////////////// Actual hooks ///////////////////////////////////////
 
-const O_RDONLY: c_int = 00;
 const O_WRONLY: c_int = 01;
 const O_RDWR: c_int = 02;
 const O_CREAT: c_int = 0x0200;
@@ -232,7 +183,7 @@ fn redirect_open(raw_path: *const c_char, flags: c_int) -> Option<CString> {
         std::ffi::OsStr::from_bytes(cpath.to_bytes())
     };
     let path = Path::new(ospath);
-    let redirected = redirect_path(path, (flags & (O_WRONLY | O_RDWR | O_CREAT)) != 0)?;
+    let redirected = redir::redirect_path(path, (flags & (O_WRONLY | O_RDWR | O_CREAT)) != 0)?;
 
     let credir = CString::new(redirected.as_os_str().as_bytes()).ok()?;
     Some(credir)
@@ -249,81 +200,8 @@ fn redirect_fopen(raw_path: *const c_char, raw_mode: *const c_char) -> Option<CS
 
     let cmode = unsafe { CStr::from_ptr(raw_mode) };
 
-    let redirected = redirect_path(path, cmode.to_bytes() != b"r")?;
+    let redirected = redir::redirect_path(path, cmode.to_bytes() != b"r")?;
 
     let credir = CString::new(redirected.as_os_str().as_bytes()).ok()?;
     Some(credir)
-}
-
-
-fn redirect_path(path: &Path, write: bool) -> Option<PathBuf> {
-    if path.is_relative() {
-        eprintln!("liboverlay: relative paths not supported {}", path.display());
-        return None;
-    }
-    // TODO: do things break when path contains `..` in the middle?
-
-    let cfg = get_config()?;
-    // Only redirect accesses to the lower directory, ignore any other accesses
-    let path_in_lower = path.strip_prefix(&cfg.lower_dir).ok()?;
-
-    let path_to_upper = cfg.upper_dir.join(path_in_lower);
-
-    // If the path alrady exists in the upper directory, redirect to that one
-    let redirect = if path_to_upper.exists() {
-        true
-    // If the flags imply write access, make a copy and redirect to that one
-    } else if write {
-        let parent_in_lower = path.parent()?;
-
-        if parent_in_lower.exists() {
-            // Make sure the directory exists
-            let parent_in_upper = path_to_upper.parent()?;
-            std::fs::create_dir_all(parent_in_upper)
-                .map_err(|e| {
-                    eprintln!(
-                        "liboverlay: could not create {}: {}",
-                        parent_in_upper.display(),
-                        e
-                    )
-                })
-                .ok()?;
-
-            // Copy source file if it exists
-            if path.exists() {
-                eprintln!("liboverlay: making writable copy");
-                // HACK: This relies crucially on the fact that fs::copy first opens the source path,
-                //  otherwise, our own redirection logic would apply and send the read request to the
-                //  newly created upper file.
-                // HACK: This is not thread safe!
-                std::fs::copy(path, &path_to_upper)
-                    .map_err(|e| {
-                        eprintln!(
-                            "liboverlay: failed to copy from lower {} to upper {}: {}",
-                            path.display(),
-                            path_to_upper.display(),
-                            e
-                        )
-                    })
-                    .ok()?;
-                let mut perms = std::fs::metadata(&path_to_upper).ok()?.permissions();
-                perms.set_readonly(false);
-                std::fs::set_permissions(&path_to_upper, perms).ok()?;
-            }
-        }
-        true
-    } else {
-        false
-    };
-
-    if redirect {
-        eprintln!(
-            "liboverlay: redirecting {} to {}",
-            path.display(),
-            path_to_upper.display()
-        );
-        Some(path_to_upper)
-    } else {
-        None
-    }
 }
