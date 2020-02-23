@@ -4,7 +4,12 @@ use crate::config;
 
 pub fn redirect_path(path: &Path, write: bool) -> Option<PathBuf> {
     if path.is_relative() {
-        config::if_debug(|| eprintln!("liboverlay: relative paths not supported {}", path.display()));
+        config::if_debug(|| {
+            eprintln!(
+                "liboverlay: relative paths not supported {}",
+                path.display()
+            )
+        });
         return None;
     }
     // TODO: do things break when path contains `..` in the middle?
@@ -27,11 +32,13 @@ pub fn redirect_path(path: &Path, write: bool) -> Option<PathBuf> {
             let parent_in_upper = path_to_upper.parent()?;
             std::fs::create_dir_all(parent_in_upper)
                 .map_err(|e| {
-                    config::if_debug(|| eprintln!(
-                        "liboverlay: could not create {}: {}",
-                        parent_in_upper.display(),
-                        e
-                    ))
+                    config::if_debug(|| {
+                        eprintln!(
+                            "liboverlay: could not create {}: {}",
+                            parent_in_upper.display(),
+                            e
+                        )
+                    })
                 })
                 .ok()?;
 
@@ -44,12 +51,14 @@ pub fn redirect_path(path: &Path, write: bool) -> Option<PathBuf> {
                 // HACK: This is not thread safe!
                 std::fs::copy(path, &path_to_upper)
                     .map_err(|e| {
-                        config::if_debug(|| eprintln!(
-                            "liboverlay: failed to copy from lower {} to upper {}: {}",
-                            path.display(),
-                            path_to_upper.display(),
-                            e
-                        ))
+                        config::if_debug(|| {
+                            eprintln!(
+                                "liboverlay: failed to copy from lower {} to upper {}: {}",
+                                path.display(),
+                                path_to_upper.display(),
+                                e
+                            )
+                        })
                     })
                     .ok()?;
                 let mut perms = std::fs::metadata(&path_to_upper).ok()?.permissions();
@@ -63,11 +72,13 @@ pub fn redirect_path(path: &Path, write: bool) -> Option<PathBuf> {
     };
 
     if redirect {
-        config::if_debug(|| eprintln!(
-            "liboverlay: redirecting {} to {}",
-            path.display(),
-            path_to_upper.display()
-        ));
+        config::if_debug(|| {
+            eprintln!(
+                "liboverlay: redirecting {} to {}",
+                path.display(),
+                path_to_upper.display()
+            )
+        });
         Some(path_to_upper)
     } else {
         None

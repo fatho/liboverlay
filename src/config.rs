@@ -58,7 +58,6 @@ pub fn get_config() -> Option<&'static Config> {
     unsafe { CONFIG.as_ref() }
 }
 
-
 #[inline(always)]
 pub fn if_debug<F: FnOnce()>(callback: F) {
     if get_config().map_or(false, |cfg| cfg.debug) {
